@@ -1,5 +1,4 @@
 (function () {
-  let currentTracks = [];
   let currentVideoId = null;
   let interceptedTimedTextUrl = null;
   let globalCaptionsTrack = null;
@@ -175,7 +174,6 @@
       });
     }
 
-    currentTracks = cleanTracks;
     currentVideoId = videoId;
 
     // If 0 tracks found, try toggling CC player button automatically to trigger network timedtext
