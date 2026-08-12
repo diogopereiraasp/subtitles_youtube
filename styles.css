@@ -284,3 +284,177 @@
     transform: rotate(360deg);
   }
 }
+
+/* Interactive Clickable Word Spans */
+.yt-sub-word {
+  display: inline-block;
+  border-radius: 3px;
+  padding: 0 1px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.yt-sub-word:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+/* Word Definition Modal Backdrop & Card */
+.yt-sub-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 999999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.yt-sub-modal-backdrop.active {
+  display: flex;
+  opacity: 1;
+}
+
+.yt-sub-modal-card {
+  background: rgba(20, 20, 28, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 480px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #f1f1f1;
+  font-family: "Roboto", "Segoe UI", Arial, sans-serif;
+  animation: yt-sub-modal-pop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes yt-sub-modal-pop {
+  from {
+    transform: scale(0.9) translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.yt-sub-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.yt-sub-modal-word {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: capitalize;
+}
+
+.yt-sub-modal-phonetic {
+  font-size: 13px;
+  color: #ff4e4e;
+  font-family: monospace;
+  background: rgba(255, 78, 78, 0.12);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.yt-sub-audio-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #fff;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.yt-sub-audio-btn:hover {
+  background: #ff0000;
+  transform: scale(1.05);
+}
+
+.yt-sub-modal-close {
+  background: transparent;
+  border: none;
+  color: #aaa;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.yt-sub-modal-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.yt-sub-modal-body {
+  padding: 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 60vh;
+}
+
+.yt-sub-modal-meaning {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.yt-sub-modal-pos {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #ff0000;
+  background: rgba(255, 0, 0, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  align-self: flex-start;
+}
+
+.yt-sub-modal-deflist {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.yt-sub-modal-def {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #e1e1e1;
+}
+
+.yt-sub-modal-example {
+  font-size: 12.5px;
+  font-style: italic;
+  color: #888;
+  margin-top: 2px;
+}

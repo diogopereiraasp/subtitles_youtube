@@ -5,7 +5,9 @@
   "description": "Displays interactive full subtitles and transcripts on the right side of YouTube videos.",
   "permissions": [],
   "host_permissions": [
-    "*://*.youtube.com/*"
+    "*://*.youtube.com/*",
+    "https://api.dictionaryapi.dev/*",
+    "https://*.wiktionary.org/*"
   ],
   "content_scripts": [
     {
