@@ -29,7 +29,7 @@ function ensureSidebarDOM(isCollapsed = false) {
  * @param {boolean} autoScrollEnabled
  * @returns {string}
  */
-function getHeaderHTML(autoScrollEnabled = true) {
+function getHeaderHTML(autoScrollEnabled = true, viewMode = 'inline') {
   return `
     <div class="yt-sub-header">
       <div class="yt-sub-title-group">
@@ -37,6 +37,9 @@ function getHeaderHTML(autoScrollEnabled = true) {
         <span>Subtitles</span>
       </div>
       <div class="yt-sub-header-actions">
+        <button class="yt-sub-btn ${viewMode === 'block' ? 'active' : ''}" id="yt-sub-toggle-viewmode" title="Switch between Line and Paragraph Block view">
+          ${viewMode === 'block' ? 'Paragraphs' : 'Inline'}
+        </button>
         <button class="yt-sub-btn ${autoScrollEnabled ? 'active' : ''}" id="yt-sub-toggle-autoscroll" title="Toggle Auto-Scroll">
           Auto-Scroll
         </button>
@@ -52,33 +55,80 @@ function getHeaderHTML(autoScrollEnabled = true) {
 }
 
 /**
- * Wraps words into interactive spans while preserving existing HTML tags
+ * Wraps words into interactive spans while preserving existing HTML tags & attaching segment data
  * @param {string} htmlText
+ * @param {number} segIndex
  * @returns {string}
  */
-function formatWordsAsInteractiveSpans(htmlText) {
+function formatWordsAsInteractiveSpans(htmlText, segIndex = 0) {
   const parts = htmlText.split(/(<[^>]+>)/g);
+  let wordOffset = 0;
   return parts
     .map((part) => {
       if (part.startsWith('<') && part.endsWith('>')) return part;
-      return part.replace(/([a-zA-Z0-9'-]+)/g, (w) => `<span class="yt-sub-word" data-word="${escapeHtml(w)}">${w}</span>`);
+      return part.replace(/([a-zA-Z0-9'-]+)/g, (w) => {
+        const span = `<span class="yt-sub-word" data-word="${escapeHtml(w)}" data-seg-index="${segIndex}" data-word-offset="${wordOffset}">${w}</span>`;
+        wordOffset++;
+        return span;
+      });
     })
     .join('');
 }
 
 /**
- * Renders list items HTML with interactive word spans
+ * Renders list items HTML with interactive word spans (supports inline and block viewMode)
  * @param {Array} subtitles
  * @param {string} filterText
+ * @param {string} viewMode
  * @returns {string}
  */
-function renderSubtitleItems(subtitles, filterText = '') {
+function renderSubtitleItems(subtitles, filterText = '', viewMode = 'inline') {
   if (!subtitles || subtitles.length === 0) {
     return `<div class="yt-sub-state">No matching captions found.</div>`;
   }
 
   const query = filterText.toLowerCase().trim();
 
+  if (viewMode === 'block') {
+    // Group subtitles into sentence paragraph blocks
+    const blocks = [];
+    let currentBlock = [];
+
+    subtitles.forEach((item, index) => {
+      currentBlock.push({ ...item, index });
+      const text = (item.text || '').trim();
+      if (/[.!?]$/.test(text) || currentBlock.length >= 4) {
+        blocks.push([...currentBlock]);
+        currentBlock = [];
+      }
+    });
+    if (currentBlock.length > 0) blocks.push(currentBlock);
+
+    return blocks
+      .map((block, blockIdx) => {
+        const firstStart = block[0].start;
+        const sentenceHtml = block
+          .map((item) => {
+            let textHtml = escapeHtml(item.text);
+            if (query) {
+              const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+              textHtml = textHtml.replace(regex, '<mark class="yt-sub-highlight">$1</mark>');
+            }
+            return `<span class="yt-sub-inline-segment" data-index="${item.index}" data-start="${item.start}">${formatWordsAsInteractiveSpans(textHtml, item.index)}</span>`;
+          })
+          .join(' ');
+
+        return `
+          <div class="yt-sub-block-item" data-block-index="${blockIdx}" data-start="${firstStart}">
+            <span class="yt-sub-time" data-start="${firstStart}">${formatTime(firstStart)}</span>
+            <div class="yt-sub-block-text">${sentenceHtml}</div>
+          </div>
+        `;
+      })
+      .join('');
+  }
+
+  // Standard Inline mode
   return subtitles
     .map((item, index) => {
       let textHtml = escapeHtml(item.text);
@@ -87,7 +137,7 @@ function renderSubtitleItems(subtitles, filterText = '') {
         textHtml = textHtml.replace(regex, '<mark class="yt-sub-highlight">$1</mark>');
       }
 
-      const interactiveText = formatWordsAsInteractiveSpans(textHtml);
+      const interactiveText = formatWordsAsInteractiveSpans(textHtml, index);
 
       return `
         <div class="yt-sub-item" data-index="${index}" data-start="${item.start}">

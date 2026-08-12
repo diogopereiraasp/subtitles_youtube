@@ -8,7 +8,9 @@ const state = {
   activeTrack: null,
   autoScrollEnabled: true,
   isCollapsed: false,
+  viewMode: 'inline', // 'inline' | 'block'
   activeIndex: -1,
+  activeWordIndex: -1,
   hasTriggeredTranscriptBtn: false
 };
 

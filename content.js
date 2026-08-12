@@ -365,7 +365,7 @@
    * @param {boolean} autoScrollEnabled
    * @returns {string}
    */
-  function getHeaderHTML(autoScrollEnabled = true) {
+  function getHeaderHTML(autoScrollEnabled = true, viewMode = 'inline') {
     return `
       <div class="yt-sub-header">
         <div class="yt-sub-title-group">
@@ -373,6 +373,9 @@
           <span>Subtitles</span>
         </div>
         <div class="yt-sub-header-actions">
+          <button class="yt-sub-btn ${viewMode === 'block' ? 'active' : ''}" id="yt-sub-toggle-viewmode" title="Switch between Line and Paragraph Block view">
+            ${viewMode === 'block' ? 'Paragraphs' : 'Inline'}
+          </button>
           <button class="yt-sub-btn ${autoScrollEnabled ? 'active' : ''}" id="yt-sub-toggle-autoscroll" title="Toggle Auto-Scroll">
             Auto-Scroll
           </button>
@@ -388,33 +391,80 @@
   }
   
   /**
-   * Wraps words into interactive spans while preserving existing HTML tags
+   * Wraps words into interactive spans while preserving existing HTML tags & attaching segment data
    * @param {string} htmlText
+   * @param {number} segIndex
    * @returns {string}
    */
-  function formatWordsAsInteractiveSpans(htmlText) {
+  function formatWordsAsInteractiveSpans(htmlText, segIndex = 0) {
     const parts = htmlText.split(/(<[^>]+>)/g);
+    let wordOffset = 0;
     return parts
       .map((part) => {
         if (part.startsWith('<') && part.endsWith('>')) return part;
-        return part.replace(/([a-zA-Z0-9'-]+)/g, (w) => `<span class="yt-sub-word" data-word="${escapeHtml(w)}">${w}</span>`);
+        return part.replace(/([a-zA-Z0-9'-]+)/g, (w) => {
+          const span = `<span class="yt-sub-word" data-word="${escapeHtml(w)}" data-seg-index="${segIndex}" data-word-offset="${wordOffset}">${w}</span>`;
+          wordOffset++;
+          return span;
+        });
       })
       .join('');
   }
   
   /**
-   * Renders list items HTML with interactive word spans
+   * Renders list items HTML with interactive word spans (supports inline and block viewMode)
    * @param {Array} subtitles
    * @param {string} filterText
+   * @param {string} viewMode
    * @returns {string}
    */
-  function renderSubtitleItems(subtitles, filterText = '') {
+  function renderSubtitleItems(subtitles, filterText = '', viewMode = 'inline') {
     if (!subtitles || subtitles.length === 0) {
       return `<div class="yt-sub-state">No matching captions found.</div>`;
     }
   
     const query = filterText.toLowerCase().trim();
   
+    if (viewMode === 'block') {
+      // Group subtitles into sentence paragraph blocks
+      const blocks = [];
+      let currentBlock = [];
+  
+      subtitles.forEach((item, index) => {
+        currentBlock.push({ ...item, index });
+        const text = (item.text || '').trim();
+        if (/[.!?]$/.test(text) || currentBlock.length >= 4) {
+          blocks.push([...currentBlock]);
+          currentBlock = [];
+        }
+      });
+      if (currentBlock.length > 0) blocks.push(currentBlock);
+  
+      return blocks
+        .map((block, blockIdx) => {
+          const firstStart = block[0].start;
+          const sentenceHtml = block
+            .map((item) => {
+              let textHtml = escapeHtml(item.text);
+              if (query) {
+                const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                textHtml = textHtml.replace(regex, '<mark class="yt-sub-highlight">$1</mark>');
+              }
+              return `<span class="yt-sub-inline-segment" data-index="${item.index}" data-start="${item.start}">${formatWordsAsInteractiveSpans(textHtml, item.index)}</span>`;
+            })
+            .join(' ');
+  
+          return `
+            <div class="yt-sub-block-item" data-block-index="${blockIdx}" data-start="${firstStart}">
+              <span class="yt-sub-time" data-start="${firstStart}">${formatTime(firstStart)}</span>
+              <div class="yt-sub-block-text">${sentenceHtml}</div>
+            </div>
+          `;
+        })
+        .join('');
+    }
+  
+    // Standard Inline mode
     return subtitles
       .map((item, index) => {
         let textHtml = escapeHtml(item.text);
@@ -423,7 +473,7 @@
           textHtml = textHtml.replace(regex, '<mark class="yt-sub-highlight">$1</mark>');
         }
   
-        const interactiveText = formatWordsAsInteractiveSpans(textHtml);
+        const interactiveText = formatWordsAsInteractiveSpans(textHtml, index);
   
         return `
           <div class="yt-sub-item" data-index="${index}" data-start="${item.start}">
@@ -739,13 +789,15 @@
     activeTrack: null,
     autoScrollEnabled: true,
     isCollapsed: false,
+    viewMode: 'inline', // 'inline' | 'block'
     activeIndex: -1,
+    activeWordIndex: -1,
     hasTriggeredTranscriptBtn: false
   };
 
   // --- src/content/sync.js ---
   /**
-   * Video playback synchronization and auto-scroll highlighting
+   * Video playback synchronization and active line highlighting
    */
   function bindVideoEvents(state) {
     const video = document.querySelector('video');
@@ -758,8 +810,10 @@
       let newIndex = -1;
   
       for (let i = 0; i < state.currentSubtitles.length; i++) {
-        const start = state.currentSubtitles[i].start;
-        const nextStart = i < state.currentSubtitles.length - 1 ? state.currentSubtitles[i + 1].start : Infinity;
+        const seg = state.currentSubtitles[i];
+        const start = seg.start;
+        const nextStart = i < state.currentSubtitles.length - 1 ? state.currentSubtitles[i + 1].start : start + (seg.duration || 4);
+  
         if (currentTime >= start && currentTime < nextStart) {
           newIndex = i;
           break;
@@ -780,15 +834,18 @@
     const subList = document.getElementById('yt-sub-list');
     if (!subList) return;
   
-    const items = subList.querySelectorAll('.yt-sub-item');
-    items.forEach((el) => el.classList.remove('active'));
+    // Clear previous active segment highlights
+    subList.querySelectorAll('.yt-sub-item, .yt-sub-block-item, .yt-sub-inline-segment').forEach((el) => el.classList.remove('active'));
   
     if (state.activeIndex >= 0) {
-      const activeEl = subList.querySelector(`.yt-sub-item[data-index="${state.activeIndex}"]`);
-      if (activeEl) {
-        activeEl.classList.add('active');
+      const activeSegEl = subList.querySelector(`.yt-sub-item[data-index="${state.activeIndex}"], .yt-sub-inline-segment[data-index="${state.activeIndex}"]`);
+      if (activeSegEl) {
+        activeSegEl.classList.add('active');
+        const parentBlock = activeSegEl.closest('.yt-sub-block-item');
+        if (parentBlock) parentBlock.classList.add('active');
+  
         if (state.autoScrollEnabled) {
-          activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          activeSegEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
       }
     }
@@ -886,19 +943,19 @@
 
   function renderSidebarLoading() {
     const root = ensureSidebarDOM(state.isCollapsed);
-    root.innerHTML = getHeaderHTML(state.autoScrollEnabled) + '<div class="yt-sub-state"><div class="yt-sub-spinner"></div><div>Fetching subtitles...</div></div>';
+    root.innerHTML = getHeaderHTML(state.autoScrollEnabled, state.viewMode) + '<div class="yt-sub-state"><div class="yt-sub-spinner"></div><div>Fetching subtitles...</div></div>';
     attachHeaderListeners();
   }
 
   function renderSidebarNoCaptions() {
     const root = ensureSidebarDOM(state.isCollapsed);
-    root.innerHTML = getHeaderHTML(state.autoScrollEnabled) + '<div class="yt-sub-state"><div>No subtitles available for this video.</div></div>';
+    root.innerHTML = getHeaderHTML(state.autoScrollEnabled, state.viewMode) + '<div class="yt-sub-state"><div>No subtitles available for this video.</div></div>';
     attachHeaderListeners();
   }
 
   function renderSidebarError(msg) {
     const root = ensureSidebarDOM(state.isCollapsed);
-    root.innerHTML = getHeaderHTML(state.autoScrollEnabled) + `<div class="yt-sub-state"><div style="color: #ff4e4e;">${escapeHtml(msg)}</div></div>`;
+    root.innerHTML = getHeaderHTML(state.autoScrollEnabled, state.viewMode) + `<div class="yt-sub-state"><div style="color: #ff4e4e;">${escapeHtml(msg)}</div></div>`;
     attachHeaderListeners();
   }
 
@@ -910,13 +967,20 @@
       return `<option value="${idx}" ${selected}>${escapeHtml(langName)}</option>`;
     }).join('');
 
-    root.innerHTML = `${getHeaderHTML(state.autoScrollEnabled)}<div class="yt-sub-controls"><div class="yt-sub-search-box"><input type="text" class="yt-sub-search-input" id="yt-sub-search" placeholder="Search transcript..." /></div>${selectOptions ? `<div class="yt-sub-select-wrapper"><select class="yt-sub-select" id="yt-sub-track-select">${selectOptions}</select></div>` : ''}</div><div class="yt-sub-list" id="yt-sub-list">${renderSubtitleItems(state.currentSubtitles)}</div>`;
+    root.innerHTML = `${getHeaderHTML(state.autoScrollEnabled, state.viewMode)}<div class="yt-sub-controls"><div class="yt-sub-search-box"><input type="text" class="yt-sub-search-input" id="yt-sub-search" placeholder="Search transcript..." /></div>${selectOptions ? `<div class="yt-sub-select-wrapper"><select class="yt-sub-select" id="yt-sub-track-select">${selectOptions}</select></div>` : ''}</div><div class="yt-sub-list" id="yt-sub-list">${renderSubtitleItems(state.currentSubtitles, '', state.viewMode)}</div>`;
     attachHeaderListeners();
     attachContentListeners();
     bindVideoEvents(state);
   }
 
   function attachHeaderListeners() {
+    const viewModeBtn = document.getElementById('yt-sub-toggle-viewmode');
+    if (viewModeBtn) {
+      viewModeBtn.onclick = () => {
+        state.viewMode = state.viewMode === 'inline' ? 'block' : 'inline';
+        renderSidebarContent();
+      };
+    }
     const autoScrollBtn = document.getElementById('yt-sub-toggle-autoscroll');
     if (autoScrollBtn) {
       autoScrollBtn.onclick = () => {
@@ -961,7 +1025,7 @@
       searchInput.oninput = (e) => {
         const val = e.target.value;
         const filtered = state.currentSubtitles.filter(i => i.text.toLowerCase().includes(val.toLowerCase().trim()));
-        subList.innerHTML = renderSubtitleItems(filtered, val);
+        subList.innerHTML = renderSubtitleItems(filtered, val, state.viewMode);
         bindItemClicks();
       };
     }
@@ -978,15 +1042,14 @@
         if (!word) return;
         const video = document.querySelector('video');
         if (video) video.pause();
-        const langCode = state.activeTrack?.languageCode || 'en';
         renderWordModalLoading(word);
-        const defData = await fetchWordDefinition(word, langCode);
+        const defData = await fetchWordDefinition(word);
         const onResume = () => { if (video) video.play(); };
         if (defData) renderWordModalContent(defData, onResume);
-        else renderWordModalError(word, 'No monolingual definition found for this word.', onResume);
+        else renderWordModalError(word, 'No definition found for this word.', onResume);
       };
     });
-    subList.querySelectorAll('.yt-sub-item').forEach(item => {
+    subList.querySelectorAll('.yt-sub-item, .yt-sub-inline-segment, .yt-sub-time').forEach(item => {
       item.onclick = (e) => {
         const start = parseFloat(item.getAttribute('data-start'));
         const video = document.querySelector('video');

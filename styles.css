@@ -285,6 +285,48 @@
   }
 }
 
+
+
+/* Paragraph Block View Layout */
+.yt-sub-block-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background 0.2s, border-color 0.2s;
+  margin-bottom: 6px;
+}
+
+.yt-sub-block-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.yt-sub-block-item.active {
+  background: rgba(255, 0, 0, 0.12);
+  border-color: rgba(255, 0, 0, 0.4);
+}
+
+.yt-sub-block-text {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #ddd;
+  word-break: break-word;
+}
+
+.yt-sub-inline-segment {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 2px;
+  transition: background 0.15s;
+}
+
+.yt-sub-inline-segment:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 /* Interactive Clickable Word Spans */
 .yt-sub-word {
   display: inline-block;
