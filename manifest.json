@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Subtitle Sidebar",
+  "version": "1.2",
+  "description": "Displays interactive full subtitles and transcripts on the right side of YouTube videos.",
+  "permissions": [],
+  "host_permissions": [
+    "*://*.youtube.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["injected.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "css": ["styles.css"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
